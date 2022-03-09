@@ -2,16 +2,14 @@ package interpolator;
 
 public class Interpolate {
 
-	static {
-		System.loadLibrary("native");
-	}
+    static {
+        System.loadLibrary("native");
+    }
+    
+    public static void wave() {
+    	new Interpolate().sayHello();
+    }
 
-	public static void main(String[] args) {
-		
-		//new Interpolate.interpolate();
-		
-	}
-	
-	private native void interpolate();
-	
+    // Declare a native method sayHello() that receives no arguments and returns void
+    private native void sayHello();
 }

@@ -1,0 +1,7 @@
+Opening log file
+javac -h native Interpolate.java
+Successfully established JNI interface header file
+gcc -c -I../include -I../include/win32 alg_1.c
+Source code compiled correctly
+gcc -Wl,--add-stdcall-alias -I../include -I../include/win32 -shared -o native.dll alg_1.c
+Error creating native library link

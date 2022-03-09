@@ -1,13 +1,11 @@
 module VideoInterpolator {
-	
-    requires javafx.fxml;
-    requires javafx.controls;
-    requires javafx.media;
-	requires javafx.graphics;
-	requires org.apache.commons.io;
-	requires javafx.base;
-	requires xuggle.xuggler.noarch;
-	requires java.desktop;
+	exports interpolator;
 
-    opens interpolator;
-} 
+	requires java.desktop;
+	requires javafx.base;
+	requires javafx.controls;
+	requires javafx.graphics;
+	requires javafx.media;
+	requires org.apache.commons.io;
+	requires xuggle.xuggler.noarch;
+}

@@ -19,22 +19,23 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.stage.Stage;
 
-import com.xuggle.xuggler.IContainer;
-import com.xuggle.xuggler.IStream;
-import com.xuggle.xuggler.IStreamCoder;
 import com.xuggle.mediatool.IMediaReader;
 import com.xuggle.mediatool.ToolFactory;
-import com.xuggle.xuggler.ICodec;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 
 public class App extends Application {
+	
+	public static FileWriter log;
+	
+	private final static File LOGFILE = new File("logs/log.txt");
 	
 	// Establishing some constant values for the application
 	private int w_b = 1280;
@@ -68,7 +69,15 @@ public class App extends Application {
 
 	// Need to remove file not found exception throws for final implementation and fix with try catch.
 	@Override
-	public void start(Stage primaryStage) throws MalformedURLException, FileNotFoundException {
+	public void start(Stage primaryStage) throws MalformedURLException, FileNotFoundException, IOException {
+		
+		try {
+			this.log = new FileWriter(LOGFILE);
+			this.log.write("Opening log file" + "\n");
+			this.log.close();
+		} catch (IOException e1) {
+			System.err.print("Error opening log file");
+		}
 
 		primaryStage.setTitle("Video Interpolator");
 		primaryStage.setWidth(w_b);
@@ -131,14 +140,18 @@ public class App extends Application {
 		player.setAutoPlay(true);
 		MediaView video_playback = new MediaView(player);
 		
-		AlgCompiler ac = new AlgCompiler();
-		ac.setAlg("src/Interpolate.java");
 		try {
-			ac.run_command_line();
+			create_native_link_file("");
+			log("Successfully established JNI interface header file");
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			log("Failed to establish JNI interface header file");
+			// Probably cause a pop-up/restart
 		}
+		
+		// Test algorithm
+		AlgCompiler a_comp = new AlgCompiler();
+		a_comp.setAlg("alg_1.c");
+		
 		
 		// Button for testing
 		Button btn = new Button();
@@ -277,6 +290,26 @@ public class App extends Application {
 	private void run_cycle() {
 		
 		
+		
+	}
+	
+	private void create_native_link_file(String os) throws IOException {
+		
+		Runtime runtime = Runtime.getRuntime();
+		Process process = runtime.exec("javac -h native src/interpolator/Interpolate.java");
+		this.log("javac -h native Interpolate.java");
+		try {
+			process.waitFor();
+		} catch (InterruptedException e) {
+			this.log("JNI header creation failed");
+		}
+	}
+	
+	public static void log(String log_text) throws IOException {
+		
+		log = new FileWriter(LOGFILE, true);
+		log.append(log_text + "\n");
+		log.close();
 		
 	}
 	
