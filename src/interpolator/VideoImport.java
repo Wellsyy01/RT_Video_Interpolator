@@ -1,5 +1,6 @@
-package interpolator;
+ package interpolator;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -7,12 +8,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 
 import org.apache.commons.io.FilenameUtils;
 
 import com.xuggle.xuggler.IContainer;
 import com.xuggle.xuggler.IStream;
 import com.xuggle.xuggler.IStreamCoder;
+import com.xuggle.mediatool.IMediaReader;
+import com.xuggle.mediatool.MediaListenerAdapter;
+import com.xuggle.mediatool.ToolFactory;
+import com.xuggle.mediatool.event.IVideoPictureEvent;
+import com.xuggle.xuggler.Global;
 import com.xuggle.xuggler.ICodec;
 
 import javafx.collections.MapChangeListener;
@@ -38,18 +45,27 @@ public class VideoImport {
 
 	private File current_video_file;
 	private Media current_video;
+	private static int stream_index;
+	private static long mLastPtsWrite;
+	private static long seconds_per_frame;
 	private int frame_count;
 	private int frame_rate;
+	private static int vid_height;
+	private static int vid_width;
 	private StackPane import_assembly;
 	private boolean valid_file;
 	private Spinner<Integer> frames_held;
 	private VideoDetails details;
 	private String meta_data;
+	private static ArrayList<int[]> video_decomp;
+	private static BufferedImage test_im = null;
+	private static int count = 0;
 
 	private UserAckPopup popup;
 
 	private double w;
 	private double h;
+	private boolean ready;
 	private static String[] acceptable_extensions = {"mp4", "mp3", "wav", "fxm", "flv", "m4a", "m4v"};
 
 	public VideoImport(Stage stage) throws MalformedURLException {
@@ -62,6 +78,13 @@ public class VideoImport {
 		this.frame_rate = 0;
 
 		this.popup = new UserAckPopup();
+		
+		this.vid_height = 0;
+		this.vid_width = 0;
+		this.stream_index = -1;
+		this.mLastPtsWrite = Global.NO_PTS;
+		
+		this.ready = false;
 
 		build_background();
 		build_import(stage);
@@ -137,6 +160,10 @@ public class VideoImport {
 					current_video_file = null;
 				}
 
+				try {
+					App.prep_vid_to_start();
+				} catch (IOException e) {
+				}
 
 			}
 		});
@@ -203,21 +230,14 @@ public class VideoImport {
 			return null;
 		}
 
-		// this.comp_vid = c_vid;
-		Path file_path = Paths.get(c_vid.getAbsolutePath());
-		BasicFileAttributes vid_details;
-		try {
-			vid_details = Files.readAttributes(file_path, BasicFileAttributes.class);
-		}
-		catch (IOException e) {
-			String prep_msg = "Error occurred when loading video";
-			this.popup.trigger_popup(prep_msg, stage);
-			return null;
-		}
 
 		this.current_video = new Media(c_vid.toURI().toURL().toString());
+		this.current_video_file = c_vid;
+		
+		this.video_decomp = new ArrayList<int[]>();
 
-		System.out.println(load_meta_data());
+		this.details.clearDetails();
+		this.details.addDetail(load_meta_data());
 
 		return (FilenameUtils.getBaseName(c_vid.toString()) + "." + FilenameUtils.getExtension(c_vid.toString()));
 
@@ -226,10 +246,10 @@ public class VideoImport {
 	// Some methodology for getting metadata taken from https://gist.github.com/ThomasBassa/f7c20ba4b6341a05cd2375f24f63e6c5
 
 
-	public String load_meta_data() throws IOException {
+	private String load_meta_data() throws IOException {
 
 		IContainer container = IContainer.make();
-		int validate = container.open(this.current_video_file.getName(), IContainer.Type.READ, null);
+		int validate = container.open(this.current_video_file.getAbsolutePath(), IContainer.Type.READ, null);
 		if (validate < 0) 
 			System.out.println("Failed to open video file");
 
@@ -254,11 +274,21 @@ public class VideoImport {
 			App.log("Could not open video decoder");
 		}
 
-		App.log("Video Height - "+vid_coder.getHeight());
+		App.log("\n"+ "Video Height - "+vid_coder.getHeight());
 		App.log("Video Width - "+vid_coder.getWidth());
-		App.log("Video FrameRate - "+vid_coder.getFrameRate());
+		App.log("Video FrameRate - "+vid_coder.getFrameRate() + "\n");
 		
-		return "hi";
+		this.vid_height = vid_coder.getHeight();
+		this.vid_width = vid_coder.getWidth();
+		this.frame_rate = (int) vid_coder.getFrameRate().getDouble();
+		this.frame_count = (int) (container.getDuration() / 1000) * this.frame_rate;
+		
+		this.stream_index = vid_stream_ID;
+		update_time_between_frames(1.0 / this.frame_rate);
+		decompose_video();
+		
+		return ("Video Resolution - "+vid_coder.getHeight()+"x"+vid_coder.getWidth() +
+				"\n" + "Video Frame Rate - " + vid_coder.getFrameRate().getDouble() + " frames per second");
 
 	}
 
@@ -269,30 +299,100 @@ public class VideoImport {
 	public File getVideoFile() {
 		return this.current_video_file;
 	}
-
-	public void skip_forward() {
-		this.frame_count = this.frame_count + (10 * this.frame_rate);
+	
+	public int getFrameRate() {
+		return this.frame_rate;
+	}
+	
+	public int getFrameCount() {
+		return this.video_decomp.size();
 	}
 
-	public void skip_forward(int amount) {
-		this.frame_count = this.frame_count + (amount * this.frame_rate);
+	public int[] getWorkingFrame(int ind) {
+
+		return this.video_decomp.get(ind);
 	}
-
-	public void skip_back() {
-		this.frame_count = this.frame_count - (10 * this.frame_rate);
-		if (this.frame_count < 0)
-			this.frame_count = 0;
+	
+	private void update_time_between_frames(double time) {
+		
+		this.seconds_per_frame = (long) (Global.DEFAULT_PTS_PER_SECOND * time);
+		
 	}
+	
+	private void decompose_video() {
+		
+		IMediaReader mediaReader = ToolFactory.makeReader(this.current_video_file.getAbsolutePath());
 
-	public void skip_back(int amount) {
-		this.frame_count = this.frame_count - (amount * this.frame_rate);
-		if (this.frame_count < 0)
-			this.frame_count = 0;
+        // stipulate that we want BufferedImages created in BGR 24bit color space
+        mediaReader.setBufferedImageTypeToGenerate(BufferedImage.TYPE_3BYTE_BGR);
+
+        mediaReader.addListener(new ImageSnapListener());
+
+        // read out the contents of the media file and
+        // dispatch events to the attached listener
+        while (mediaReader.readPacket() == null) ;
+        
+        this.ready = true;
+        
 	}
+	
+	 private static class ImageSnapListener extends MediaListenerAdapter {
 
-	public Image getWorkingFrame() {
+			public void onVideoPicture(IVideoPictureEvent event) {
 
-		return null;
+	            if (event.getStreamIndex() != stream_index) {
+	                // if the selected video stream id is not yet set, go ahead an
+	                // select this lucky video stream
+	                if (stream_index == -1)
+	                	stream_index = event.getStreamIndex();
+	                // no need to show frames from this video stream
+	                else
+	                    return;
+	            }
+
+	            // if uninitialized, back date mLastPtsWrite to get the very first frame
+	            if (mLastPtsWrite == Global.NO_PTS)
+	                mLastPtsWrite = event.getTimeStamp() - seconds_per_frame;
+
+	            // if it's time to write the next frame
+	            if (event.getTimeStamp() - mLastPtsWrite >= 
+	            		seconds_per_frame) {
+	            	
+	            	count++;
+	                BufferedImage im = event.getImage();
+	                if (test_im == null); 
+	                	test_im = im;
+	                
+	                int[] pixel_vals = new int[vid_width * vid_height];
+	                im.getRGB(0, 0, vid_width, vid_height, pixel_vals, 0, vid_width);
+	                video_decomp.add(pixel_vals);
+
+	                // update last write time
+	                mLastPtsWrite += seconds_per_frame;
+	            }
+
+	        }
+
+	 }
+	 
+	 public ArrayList<int[]> get_decomp(){
+		 return this.video_decomp;
+	 }
+
+	public int getWidth() {
+		return this.vid_width;
 	}
-
+	
+	public int getHeight() {
+		return this.vid_height;
+	}
+	
+	public boolean getReady() {
+		return this.ready;
+	}
+	
+	public BufferedImage getTIM() {
+		return this.test_im;
+	}
+	
 }

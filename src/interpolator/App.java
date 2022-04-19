@@ -2,6 +2,8 @@ package interpolator;
 
 import org.apache.commons.io.FilenameUtils;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -18,6 +20,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import com.xuggle.mediatool.IMediaReader;
 import com.xuggle.mediatool.ToolFactory;
@@ -31,6 +34,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 
+import javax.imageio.ImageIO;
+
 public class App extends Application {
 	
 	public static FileWriter log;
@@ -43,7 +48,7 @@ public class App extends Application {
 	private double ratio = 0.7;
 	
 	// This is the video player
-	private VideoPlayer vp;
+	private static VideoPlayer vp;
 	private StackPane v_outlet;
 	
 	// This is the diagnostics
@@ -51,20 +56,27 @@ public class App extends Application {
 	private StackPane diag_outlet;
 	
 	// This is the video importing section
-	private VideoImport vid_import;
+	private static VideoImport vid_import;
 	private StackPane vid_imp_outlet;
+	private static int vid_width;
+	private static int vid_height;
 	
 	// This is the algorithm importing section
 	private AlgorithmImport alg_import;
 	private StackPane alg_outlet;
 	
 	// This is any additional options added
-	private Options options;
+	private static Options options;
 	private StackPane opt_outlet;
+
+	private static int frame_rate;
+	private static boolean vid_ready = false;
+	private static boolean alg_ready = false;
 	
 	
 	public static void main(String[] args) {
 		launch(args);
+		
 	}
 
 	// Need to remove file not found exception throws for final implementation and fix with try catch.
@@ -129,40 +141,14 @@ public class App extends Application {
 		// Test images
 		File p1 = new File("src/pic1.jpg");
 		File p2 = new File("src/pic2.jpg");
-		InputStream stream1 = new FileInputStream(p1);
-		InputStream stream2 = new FileInputStream(p2);
-		display_frame(vp, stream1);
 		
 		// Test video
-		File vid_file = new File("src/sample-mp4-file-small.mp4");
+		/*File vid_file = new File("src/sample-mp4-file-small.mp4");
 		Media test_vid = new Media(vid_file.toURI().toURL().toString());
 		MediaPlayer player = new MediaPlayer(test_vid);
 		player.setAutoPlay(true);
-		MediaView video_playback = new MediaView(player);
+		MediaView video_playback = new MediaView(player);*/
 		
-		try {
-			create_native_link_file("");
-			log("Successfully established JNI interface header file");
-		} catch (IOException e) {
-			log("Failed to establish JNI interface header file");
-			// Probably cause a pop-up/restart
-		}
-		
-		// Test algorithm
-		AlgCompiler a_comp = new AlgCompiler();
-		a_comp.setAlg("alg_1.c");
-		
-		
-		// Button for testing
-		Button btn = new Button();
-		btn.setText("Say 'Hello World'");
-		btn.setOnAction(new EventHandler<ActionEvent>() {
-
-			@Override
-			public void handle(ActionEvent event) {
-				display_frame(vp, stream2);
-			}
-		});
 		
 		// Setting up the GUI
 		l_col.getChildren().add(this.v_outlet);
@@ -171,8 +157,8 @@ public class App extends Application {
 		r_col.getChildren().add(internal_col);
 		
 		GridPane root = new GridPane();
-		l_col.setStyle("-fx-background-color: green;");
-		r_col.setStyle("-fx-background-color: red;");
+		l_col.setStyle("-fx-background-color: darkgray;");
+		r_col.setStyle("-fx-background-color: darkgray;");
 		root.add(l_col, 0, 0);
 		root.add(r_col, 1, 0);
 		
@@ -182,129 +168,87 @@ public class App extends Application {
 		primaryStage.setScene(scene);
 		primaryStage.show();
 		
-	}
-	
-	
-	
-	private InputStream get_frame(File video) {
-		
-		/*IContainer stream_container = IContainer.make();
-		
-		if (stream_container.open(video.getName(), IContainer.Type.READ, null) < 0)
-		      System.out.println("could not open file: " + video.getName());
-		
-		
-		// Get correct video stream and it's decoder
-		int videoStreamIndex;
-		IStreamCoder videoCoder = null;
-		for (int i = 0 ; i < stream_container.getNumStreams() ; i++) {
-			
-			IStream stream = stream_container.getStream(i);
-			IStreamCoder stream_coder = stream.getStreamCoder();
-			
-			if (stream_coder.getCodecType() == ICodec.Type.CODEC_TYPE_VIDEO)
-		      {
-		        videoStreamIndex = i;
-		        videoCoder = stream_coder;
-		        break;
-		      }
-			
-		}
-		
-		if (videoCoder == null) {
-			System.out.println("Video stream cannot be found");
-		}
-		
-		return null;
-		*/
-		
-		IMediaReader reader = ToolFactory.makeReader(video.getName());
-		reader.setBufferedImageTypeToGenerate(BufferedImage.TYPE_3BYTE_BGR);
-		return null;
 		
 	}
 	
-	private static class ImageSnapListener {
-		 
-        /*public void onVideoPicture(IVideoPictureEvent event) {
- 
-            if (event.getStreamIndex() != mVideoStreamIndex) {
-                // if the selected video stream id is not yet set, go ahead an
-                // select this lucky video stream
-                if (mVideoStreamIndex == -1)
-                    mVideoStreamIndex = event.getStreamIndex();
-                // no need to show frames from this video stream
-                else
-                    return;
-            }
- 
-            // if uninitialized, back date mLastPtsWrite to get the very first frame
-            if (mLastPtsWrite == Global.NO_PTS)
-                mLastPtsWrite = event.getTimeStamp() - MICRO_SECONDS_BETWEEN_FRAMES;
- 
-            // if it's time to write the next frame
-            if (event.getTimeStamp() - mLastPtsWrite >= 
-                    MICRO_SECONDS_BETWEEN_FRAMES) {
-                                 
-                String outputFilename = dumpImageToFile(event.getImage());
- 
-                // indicate file written
-                double seconds = ((double) event.getTimeStamp()) / 
-                    Global.DEFAULT_PTS_PER_SECOND;
-                System.out.printf(
-                        "at elapsed time of %6.3f seconds wrote: %s\n",
-                        seconds, outputFilename);
- 
-                // update last write time
-                mLastPtsWrite += MICRO_SECONDS_BETWEEN_FRAMES;
-            }
- 
-        }
-         
-        private String dumpImageToFile(BufferedImage image) {
-            try {
-                String outputFilename = outputFilePrefix + 
-                     System.currentTimeMillis() + ".png";
-                ImageIO.write(image, "png", new File(outputFilename));
-                return outputFilename;
-            } 
-            catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
-        }
- 
- 	*/
-    } 
+	public static void start_video_process(double fr) {
+		System.out.println("howdy");
+
+		 Timeline r_vid = new Timeline(new KeyFrame(Duration.seconds(1/fr), (ActionEvent event) ->
+	        {
+	        	try {
+					run_cycle();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+	        }));
+        r_vid.setCycleCount(Timeline.INDEFINITE);
+        r_vid.play(); 
+        
+	}
+	
+	public static void prep_vid_to_start() throws IOException {
+		
+		vid_width = vid_import.getWidth();
+		vid_height = vid_import.getHeight();
+		frame_rate = vid_import.getFrameRate();
+		System.out.println(vid_import.getFrameCount());
+		vp.establish_controller_vars(vid_import.getFrameCount());
+		BufferedImage test_im = vid_import.getTIM();
+		display_frame(vp, test_im);
+		vid_ready = true;
+		if (alg_ready) {
+			start_video_process(frame_rate);
+		}
+		
+		
+	}
+	
+	public static void prep_alg_to_start(String dir) throws IOException {
+		
+		create_native_link_file(System.getProperty("os.name"), dir);
+		alg_ready = true;
+		if (vid_ready) {
+			start_video_process(frame_rate);
+		}
+		
+	}
 
 	// Load a frame and then output it into the video player
-	private void display_frame(VideoPlayer vp, InputStream image_file) {
-		
-		/*vp.loadFrame(image_file);
-		v_outlet.getChildren().remove(1);
-		
-		v_outlet.getChildren().add(new ImageView(c_frame));*/
+	private static void display_frame(VideoPlayer vp, BufferedImage image) {
+		vp.loadFrame(image); 
 		
 	}
 	
-	private void run_cycle() {
+	private static void run_cycle() throws IOException {
 		
+		int index = vp.which_frame(frame_rate);
+		int[] frame = vid_import.getWorkingFrame(index);
+		int[] targ_res = options.getTR();
 		
+		int[] n_frame = Interpolate.link(frame, vid_width, vid_height, targ_res[0], targ_res[1]);
+		
+		BufferedImage dis_image = new BufferedImage(vid_import.getWidth(), vid_import.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
+		dis_image.setRGB(0, 0, vid_width, vid_height, n_frame, 0, vid_width);
+		display_frame(vp, dis_image);
 		
 	}
 	
-	private void create_native_link_file(String os) throws IOException {
+	// Create header file for native files to use
+	private static void create_native_link_file(String os, String dir) throws IOException {
 		
 		Runtime runtime = Runtime.getRuntime();
-		Process process = runtime.exec("javac -h native src/interpolator/Interpolate.java");
-		this.log("javac -h native Interpolate.java");
+		Process process = runtime.exec("javac -h native/"+dir+" src/interpolator/Interpolate.java");
+		log("javac -h native Interpolate.java");
 		try {
 			process.waitFor();
 		} catch (InterruptedException e) {
-			this.log("JNI header creation failed");
+			log("JNI header creation failed");
 		}
 	}
 	
+	// Log the entered text
 	public static void log(String log_text) throws IOException {
 		
 		log = new FileWriter(LOGFILE, true);

@@ -57,13 +57,13 @@ public class Options {
 		
 		this.targ_res = new ChoiceBox<String>();
 		List<String> choices = new ArrayList<String>();
-		choices.add("Option 1");
-		choices.add("Option 2");
-		choices.add("Option 3");
+		choices.add("1280x720");
+
 		ObservableList<String> ob_choices = FXCollections.observableList(choices);
 		this.targ_res.setTranslateX(255);
 		this.targ_res.setTranslateY(25);
 		this.targ_res.setItems(ob_choices);
+		this.targ_res.getSelectionModel().selectFirst();
 		
 		option_list.getChildren().add(targ_res);
 		
@@ -76,13 +76,13 @@ public class Options {
 		
 		this.max_frame_rate = new ChoiceBox<String>();
 		choices = new ArrayList<String>();
-		choices.add("Option 1");
-		choices.add("Option 2");
-		choices.add("Option 3");
+		choices.add("30");
+
 		ob_choices = FXCollections.observableList(choices);
 		this.max_frame_rate.setTranslateX(255);
 		this.max_frame_rate.setTranslateY(55);
 		this.max_frame_rate.setItems(ob_choices);
+		this.max_frame_rate.getSelectionModel().selectFirst();
 		option_list.getChildren().add(max_frame_rate);
 		
 		this.option_assembly.getChildren().add(option_list);
@@ -91,6 +91,16 @@ public class Options {
 	
 	public StackPane getOptions() {
 		return this.option_assembly;
+	}
+	
+	public String getMFR() {
+		return this.max_frame_rate.getValue().toString();
+	}
+	
+	public int[] getTR() {
+		String[] w_h_string = this.targ_res.getValue().toString().split("x");
+		int[] return_arr = {Integer.parseInt(w_h_string[0]), Integer.parseInt(w_h_string[1])};
+		return return_arr;
 	}
 	
 }

@@ -6,10 +6,9 @@ public class Interpolate {
         System.loadLibrary("native");
     }
     
-    public static void wave() {
-    	new Interpolate().sayHello();
+    public static int[] link(int[] pixels, int width, int height, int target_width, int target_height) {
+    	return (new Interpolate().interpolate(pixels, width, height, target_width, target_height));
     }
 
-    // Declare a native method sayHello() that receives no arguments and returns void
-    private native void sayHello();
+    private native int[] interpolate(int[] pixels, int width, int height, int target_width, int target_height);
 }

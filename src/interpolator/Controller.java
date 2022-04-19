@@ -13,6 +13,9 @@ public class Controller {
 	private boolean[] pressed = {false, false, false, false, false};
 	private Group playbar;
 	private HBox controller_assembly;
+	private int frame_count;
+	private int tot_frames;
+	private boolean paused = false;
 	
 	// This is effectively a collection of the buttons used to control the interpolated video.
 	public Controller() {
@@ -95,6 +98,62 @@ public class Controller {
 		}
 	}
 	
+	public void skip_forward(int fps) {
+		this.frame_count = this.frame_count + (10 * fps);
+		if (this.frame_count > this.tot_frames)
+			this.frame_count = this.tot_frames;
+	}
+
+	public void skip_back(int fps) {
+		this.frame_count = this.frame_count - (10 * fps);
+		if (this.frame_count < 0)
+			this.frame_count = 0;
+	}
 	
+	public void next_frame() {
+		this.frame_count++;
+		if (this.frame_count > this.tot_frames)
+			this.frame_count = this.tot_frames;
+	}
+	
+	public void setTFrames(int tot_frames) {
+		this.tot_frames = tot_frames;
+		this.frame_count = 0;
+	}
+	
+	public int interpolate_what(int fps) {
+		
+		if (getPressedInd(1)) {
+			if (this.paused) {
+				pushButton(0);
+				this.paused = false;
+			} else {
+				resetButton(0);
+				this.paused = true;
+			}
+		}
+		
+		if (!this.paused && this.frame_count < (this.tot_frames - 1)) {
+			next_frame();
+		} else if (!this.paused) {
+			this.paused = true;
+		}
+		
+		if (getPressedInd(2)) {
+			skip_forward(fps);
+			resetButton(2);
+		} else if (getPressedInd(3)) {
+			skip_back(fps);
+			resetButton(3);
+		} else if (getPressedInd(4)) {
+			this.frame_count = 0;
+			resetButton(4);
+		}
+		return this.frame_count;
+	}
+	
+	public int get_frame_num() {
+		return this.frame_count;
+	}
 	
 }

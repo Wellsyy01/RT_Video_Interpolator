@@ -1,9 +1,11 @@
 package interpolator;
 
+import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
@@ -19,7 +21,8 @@ public class VideoPlayer {
 	private StackPane assembled_player;
 	private ImageView viewport;
 	private Image c_image;
-	private ArrayList<InputStream> cached_images;
+	private int c_frame;
+	private ArrayList<Image> cached_images;
 	private Controller play_bar;
 	
 	private double w = 720;
@@ -45,7 +48,7 @@ public class VideoPlayer {
 
 		this.assembled_player.getChildren().add(controller);
 
-		this.cached_images = new ArrayList<InputStream>();
+		this.cached_images = new ArrayList<Image>();
 		
 	}
 	
@@ -80,7 +83,9 @@ public class VideoPlayer {
 	}
 	
 	// Videos are played frame by frame, this loads the frame into the video player object one at a time.
-	public Image loadFrame(InputStream image_stream) {
+	public Image loadFrame(BufferedImage image) {
+		
+		Image conv_im = SwingFXUtils.toFXImage(image, null);
 		
 		boolean[] pushed = check_pushed();
 
@@ -88,21 +93,19 @@ public class VideoPlayer {
 			return this.c_image;
 		}
 		
-		this.cached_images.add(image_stream);
-		this.c_image = new Image(image_stream);
+		this.cached_images.add(conv_im);
 		
 		// Fit the image either by height or by width, by whichever difference from the native viewbox is greater
-		double w_ratio = this.w / this.c_image.getWidth();
-		double h_ratio = this.h / this.c_image.getHeight();
+		double w_ratio = this.w / image.getWidth();
+		double h_ratio = this.h / image.getHeight();
 		if (w_ratio > h_ratio) {
 			this.viewport.setFitWidth(this.w);
 		} else {
 			this.viewport.setFitHeight(this.h);
 		}
 		
-		this.viewport.setImage(c_image);
-		
-		return this.c_image;
+		this.viewport.setImage(conv_im);
+		return conv_im;
 		
 	}
 	
@@ -132,6 +135,14 @@ public class VideoPlayer {
 		
 	}
 	
+	public int which_frame(int fps) {
+		this.c_frame = this.play_bar.interpolate_what(fps);
+		return this.c_frame;
+	}
+	
+	public void establish_controller_vars(int t_frames) {
+		this.play_bar.setTFrames(t_frames);
+	}
 	
 
 }

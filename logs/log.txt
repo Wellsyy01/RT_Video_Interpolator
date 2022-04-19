@@ -1,7 +1,12 @@
 Opening log file
+Could not open video decoder
+
+Video Height - 240
+Video Width - 320
+Video FrameRate - 15/1
+
 javac -h native Interpolate.java
-Successfully established JNI interface header file
-gcc -c -I../include -I../include/win32 alg_1.c
+gcc -c -I../../include -I../../include/win32 alg_1.c
 Source code compiled correctly
-gcc -Wl,--add-stdcall-alias -I../include -I../include/win32 -shared -o native.dll alg_1.c
+gcc -Wl,--add-stdcall-alias -I../../include -I../../include/win32 -shared -o ../native.dll alg_1.c
 Error creating native library link

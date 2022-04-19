@@ -1,7 +1,12 @@
 package interpolator;
 
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
+
+import org.apache.commons.io.FilenameUtils;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -82,11 +87,20 @@ public class AlgorithmImport {
 			@Override
 			public void handle(ActionEvent event) {
 				File alg = alg_chooser.showOpenDialog(stage);
-				String file_name = load_alg(alg);
+				String file_name = null;
+
+					try {
+						file_name = load_alg(alg);
+					} catch (IOException e) {
+
+						e.printStackTrace();
+					}
+
 				if (file_name != null) {
 					valid_file = true;
 					alg_file_name.setText(file_name);
 				}
+				
 			}
 		});
 		open_file_finder.setPrefSize(30, 25);
@@ -177,13 +191,52 @@ public class AlgorithmImport {
 		return this.import_assembly;
 	}
 	
+	// Build new directory for the native files
+	private void build_dir(String name) {
+		
+		File dir = new File("./native/"+name);
+		dir.mkdir();
+		
+	}
+	
+	// Copy the c file provided into the newly established directory
+	private void setup_alg(File alg, String dir_name) throws IOException {
+		
+		String file_name = FilenameUtils.getName(alg.toString());
+		File new_file = new File("./native/"+dir_name+"/"+file_name);
+		System.out.println(new_file.toString());
+		new_file.createNewFile();
+		
+		FileReader fr = new FileReader(alg);
+		FileWriter fw = new FileWriter(new_file);
+		
+		int i;
+		String content = "";
+		while (((i = fr.read()) != -1)) {
+			content += (char) i;
+		}
+		
+		fw.write(content);
+		fr.close();
+		fw.close();
+		
+	}
+	
 	// Check the associated file is a valid file type (i.e the system can handle it)
 	// Returns the file name and extension without the path
-	private String load_alg(File alg) {
+	private String load_alg(File alg) throws IOException {
 		
-		// TODO Implement process to check algorithm extension / validity
+		String f_b_name = FilenameUtils.getBaseName(alg.toString());
+		String f_name = f_b_name + "." + FilenameUtils.getExtension(alg.toString());
+		build_dir(f_b_name);
+		App.prep_alg_to_start(f_b_name);
+		setup_alg(alg, f_b_name);
+		AlgCompiler ac = new AlgCompiler();
 		
-		return "";
+		ac.setAlg(f_name, f_b_name);
+		
+		
+		return f_name;
 		
 	}
 	

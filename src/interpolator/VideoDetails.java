@@ -42,6 +42,7 @@ public class VideoDetails {
 			this.detail_list.getChildren().add(details.get(i));
 		}
 		
+		System.out.println("hi");
 		this.detail_assembly.getChildren().add(this.detail_list);
 
 	}
@@ -61,6 +62,10 @@ public class VideoDetails {
 
 		build_detail_box();
 
+	}
+	
+	public void clearDetails() {
+		this.details = new ArrayList<Text>();
 	}
 
 	public void addDetail(String text) {
